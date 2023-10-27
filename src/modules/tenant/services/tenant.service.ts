@@ -33,6 +33,9 @@ export class TenantService extends TenantProviderService<Tenant> {
         const migrationsStatus = await this.applyMigrationsToTenant(
           payload.subdomain,
         );
+        console.log(
+          `Tenant [${payload.subdomain}] migration status (True/False): ${migrationsStatus}`,
+        );
         // create public tenant record
         const user = await this.publicRepoInstance.create(payload);
         response.data = user;
@@ -117,8 +120,19 @@ export class TenantService extends TenantProviderService<Tenant> {
     return response;
   }
 
-  async deleteTenant() {
+  async deleteTenant(schemaName: string) {
     const response = new ResponseDTO<boolean>();
+    this.deleteSchema(schemaName)
+      .then((result) => {
+        console.log(result);
+      })
+      .then((err) => {
+        console.error(err);
+      });
+    response.message = 'Tenanted delete started';
+    response.code = RESPONSE_CODE._200;
+    response.status = true;
+
     return response;
   }
 }

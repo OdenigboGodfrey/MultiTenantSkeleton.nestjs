@@ -51,27 +51,32 @@ export class TenantProviderService<T extends Model<T, T>> {
     }
   }
 
-  protected async createSchema(schemaName: string) {
+  private async getSchema(schemaName) {
     try {
-      // check if schema exist
       const schemaExistSql = `SELECT schema_name FROM information_schema.schemata WHERE schema_name = ?`;
-      let [schemaExist] = await this.publicRepoInstance.sequelize.query(
+      const [schemaExist] = await this.publicRepoInstance.sequelize.query(
         schemaExistSql,
         {
           replacements: [schemaName],
         },
       );
+      return schemaExist;
+    } catch (e) {
+      console.error(e);
+    }
+    return null;
+  }
+
+  protected async createSchema(schemaName: string) {
+    try {
+      // check if schema exist
+      let schemaExist = await this.getSchema(schemaName);
       if (schemaExist.length == 0) {
         // schema doesnt exist
         await this.publicRepoInstance.sequelize
           .getQueryInterface()
           .createSchema(schemaName);
-        [schemaExist] = await this.publicRepoInstance.sequelize.query(
-          schemaExistSql,
-          {
-            replacements: [schemaName],
-          },
-        );
+        schemaExist = await this.getSchema(schemaName);
       }
       return schemaExist != undefined && schemaExist != null;
     } catch (e) {
@@ -93,19 +98,65 @@ export class TenantProviderService<T extends Model<T, T>> {
     return false;
   }
 
-  protected async deleteSchema(schemaName: string) {
+  async deleteSchema(schemaName: string): Promise<boolean> {
     try {
-      // query to Drop all tables in the schema
-      // Create a new DbCommand query for dropping the table
-      // Drop the schema query
-      // execute the queries from above
-      const schemaExistSql = `SELECT table_name
-      FROM information_schema.tables
-      WHERE table_schema = ?`;
-      return true;
+      // Drop all tables in the schema
+      const tables = async () =>
+        await this.publicRepoInstance.sequelize.query(
+          `SELECT * FROM information_schema.tables WHERE table_schema = '${schemaName}'`,
+        );
+      let dependenciesSQL = '';
+
+      let sql: string = '';
+      const _tables = await tables();
+      for (const table of _tables[0]) {
+        const tableName = table['table_name'];
+        // get dependecies/constraints
+        const dependencies = await this.findTableDependencies(
+          schemaName,
+          tableName,
+        );
+        for (const dependency of dependencies) {
+          // Drop foreign key constraints and other dependent objects here.
+          dependenciesSQL += `ALTER TABLE "${schemaName}"."${tableName}" DROP CONSTRAINT IF EXISTS "${dependency}";`;
+        }
+        sql += `DROP TABLE "${schemaName}"."${tableName}" cascade;`;
+      }
+
+      // Drop the schema
+      sql += `DROP SCHEMA "${schemaName}" cascade;`;
+      sql = `${dependenciesSQL}${sql}`;
+      // console.log('sql', sql);
+      await this.publicRepoInstance.sequelize.query(sql);
+
+      // Check if the schema still exists
+      return (await this.getSchema(schemaName)).length == 0;
     } catch (e) {
-      console.error(e);
+      console.error(`Exception: ${e.message} ${e.stack}`);
     }
     return false;
+  }
+
+  private async findTableDependencies(
+    schemaName: string,
+    tableName: string,
+  ): Promise<string[]> {
+    const query = `
+      SELECT conname
+      FROM pg_constraint
+      WHERE confrelid = (
+        SELECT oid
+        FROM pg_class
+        WHERE relname = '${tableName}' AND relnamespace = (
+          SELECT oid
+          FROM pg_namespace
+          WHERE nspname = '${schemaName}'
+        )
+      );
+    `;
+
+    const [result] = await this.publicRepoInstance.sequelize.query(query);
+    const dependencies = result.map((row: any) => row.conname);
+    return dependencies;
   }
 }

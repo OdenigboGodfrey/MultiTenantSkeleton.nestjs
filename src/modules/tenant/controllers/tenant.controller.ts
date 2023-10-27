@@ -25,6 +25,7 @@ import {
   PaginationParameterRequestDTO,
   PaginationParameterResponseDTO,
 } from 'src/shared/dto/pagination.dto';
+import { SchemaService } from 'src/database-module/service/schema.service';
 
 @Controller('tenant')
 @ApiTags('tenant')
@@ -84,7 +85,7 @@ export class TenantController {
   }
 
   @ApiOperation({
-    description: 'remove tenant',
+    description: 'remove this tenant',
   })
   @ApiProduces('json')
   @ApiConsumes('application/json', 'multipart/form-data')
@@ -94,9 +95,8 @@ export class TenantController {
   @Delete('/remove')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
-  @ApiBody({ type: NewTenantDTO })
   async remove(): Promise<ResponseDTO<boolean>> {
-    const response = await this.service.deleteTenant();
+    const response = await this.service.deleteTenant(SchemaService.get());
     return response.getResponse();
   }
 }
