@@ -1,0 +1,22 @@
+version: "3"
+services:
+  web:
+    container_name: BlogApp
+    stdin_open: true
+    tty: true 
+    # build: 
+    #   context: .
+    #   dockerfile: ./Dockerfile
+    image: gvgodfrey/auxillorx-cache
+    environment:
+      - PG_HOST=auxillodb-instane.cd66qdayynus.us-east-2.rds.amazonaws.com
+      - PG_PORT=5432
+      - PG_USERNAME=auxillorxdbuser
+      - PG_PASSWORD=8ODkmniytWmEd2f
+      - PG_DATABASENAME=postgres
+      - PORT=3002
+      - SECRET_KEY='blog_uSER_api&#$@-dev'
+      - NODE_ENV=development
+      - APP_NAME='Blog App'
+    ports:
+      - 80:3002

@@ -1,0 +1,17 @@
+export enum PERMISSIONS {
+  // patient = 'patient',
+  // physician = 'physician',
+  // pharmacist = 'pharmacist',
+  // updateUserProfile = 'update-user-profile',
+  // superadmin = 'superadmin',
+  auditLog = 'audit-log',
+  patientRecord = 'patient-record',
+  pharamcistRecord = 'pharamcist-record',
+  physicianRecord = 'physician-record',
+  createAdmin = 'create-admin',
+  resetPassword = 'reset-password',
+  banUser = 'ban-user',
+  patientSubscription = 'patient-subscription',
+  deleteUser = 'delete-user',
+  appointment = 'appointment',
+}
