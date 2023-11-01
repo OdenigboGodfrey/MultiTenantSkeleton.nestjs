@@ -9,6 +9,7 @@ import { RESPONSE_CODE } from './../../../shared/enums/response-code.enum';
 import { ErrorClass } from './../../../shared/dto/error-class.dto';
 import { WINSTON_MODULE_PROVIDER } from 'nest-winston';
 import { Logger } from 'winston';
+import { SchemaService } from 'src/database-module/service/schema.service';
 
 @Injectable()
 export class AuthService {
@@ -36,9 +37,10 @@ export class AuthService {
   generateJWT(userObject: any): ResponseDTO<AuthUserDTO> {
     const response = new ResponseDTO<AuthUserDTO>();
     try {
+      const subdomain: string = SchemaService.get();
       const authUserDTO = new AuthUserDTO({});
       authUserDTO.token = this.jwtService.sign(
-        { ...userObject },
+        { ...userObject, ...{ tenant: subdomain } },
         { secret: jwtConstants.secret },
       );
       response.data = authUserDTO;

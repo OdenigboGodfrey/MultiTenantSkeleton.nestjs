@@ -1,7 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { TenantProviderService } from 'src/tenant-provider/services/tenant-provider-service';
 import { Logger } from 'winston';
-import { NewTenantDTO } from '../dto/tenant.dto';
+import { NewTenantDTO, TenantDTO } from '../dto/tenant.dto';
 import { Tenant } from '../entities/tenant.entity';
 import { ResponseDTO } from 'src/shared/dto/response.dto';
 import { RESPONSE_CODE } from 'src/shared/enums/response-code.enum';
@@ -123,16 +123,65 @@ export class TenantService extends TenantProviderService<Tenant> {
   async deleteTenant(schemaName: string) {
     const response = new ResponseDTO<boolean>();
     this.deleteSchema(schemaName)
-      .then((result) => {
+      .then(async (result) => {
         console.log(result);
+        // remove tenant info from public schema
+        const tenantRow = await this.publicRepoInstance.destroy({
+          where: { subdomain: schemaName },
+        });
+        console.log('tenantRow', tenantRow);
+        // if (tenantRow) {}
       })
       .then((err) => {
         console.error(err);
       });
-    response.message = 'Tenanted delete started';
+    response.message = 'Tenant delete started';
     response.code = RESPONSE_CODE._200;
     response.status = true;
 
+    return response;
+  }
+
+  async getTenant(
+    schemaName: string,
+  ): Promise<ResponseDTO<Tenant | TenantDTO>> {
+    const response = new ResponseDTO<Tenant | TenantDTO>();
+    response.code = RESPONSE_CODE._400;
+    response.message = 'No tenant found.';
+    try {
+      const publicSchemaResult = await this.isPublicSchema(schemaName);
+      if (publicSchemaResult) {
+        response.data = new TenantDTO({
+          companyName: schemaName,
+          status: 'active',
+          subdomain: schemaName,
+        });
+        response.status = true;
+        response.code = RESPONSE_CODE._200;
+        response.message = 'Tenant fetched.';
+        return response;
+      }
+      const result = await this.publicRepoInstance.findOne({
+        where: { subdomain: schemaName },
+      });
+      if (result) {
+        response.data = result;
+        response.status = true;
+        response.code = RESPONSE_CODE._200;
+        response.message = 'Tenant fetched.';
+      }
+    } catch (e) {
+      console.error('function', e);
+      response.message = 'An error occurred.';
+      response.extra_data = e.toString();
+      response.code = RESPONSE_CODE._500;
+      const errorObject: ErrorClass<any> = {
+        payload: null,
+        error: e['errors'],
+        response: response,
+      };
+      this.logger.error(e.toString(), errorObject);
+    }
     return response;
   }
 }

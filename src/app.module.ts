@@ -14,6 +14,8 @@ import { jwtConstants } from './modules/auth/constants';
 import { JwtStrategy } from './modules/auth/jwt.strategy';
 import { TenantProviderMiddleware } from './tenant-provider/middlewares/tenant-provider.middleware';
 import { TenantModule } from './modules/tenant/tenant.module';
+import { TenantService } from './modules/tenant/services/tenant.service';
+import { TenantRepository } from './modules/tenant/repositories/tenant.repository';
 
 @Module({
   imports: [
@@ -56,6 +58,14 @@ import { TenantModule } from './modules/tenant/tenant.module';
     {
       provide: 'JwtService',
       useClass: JwtService,
+    },
+    {
+      provide: 'TenantService',
+      useClass: TenantService,
+    },
+    {
+      provide: 'TenantRepositoryInterface',
+      useClass: TenantRepository,
     },
     TenantProviderMiddleware,
   ],

@@ -1,17 +1,46 @@
 import { Model, ModelCtor } from 'sequelize-typescript';
 import { BaseInterfaceRepository } from 'src/repositories/base/base.interface.repository';
 import { SchemaService } from 'src/database-module/service/schema.service';
+import { Injectable } from '@nestjs/common';
+import { isPublicSchema, processSubdomain } from './../utils/utils';
 
 type EntityModelMap = {
   [key: string]: ModelCtor<any>;
 };
 
+@Injectable()
 export class TenantProviderService<T extends Model<T, T>> {
   constructor(
     protected readonly repository: BaseInterfaceRepository<T>,
     protected readonly entityModel: ModelCtor<T>,
   ) {
     this.registerEntity(entityModel);
+  }
+
+  private static entities: EntityModelMap = {};
+
+  protected async registerEntity(entity: ModelCtor) {
+    console.log(
+      'registering module',
+      Object.keys(TenantProviderService.entities),
+    );
+    if (!TenantProviderService.entities[entity.name]) {
+      TenantProviderService.entities[entity.name] = entity;
+      console.log('registering module', entity.name);
+    }
+  }
+
+  protected async applyMigrationsToTenant(schema: string) {
+    try {
+      // apply migration to migrate registered entities
+      Object.values(TenantProviderService.entities).forEach((entity) => {
+        this.repository.getRepo(entity).schema(schema).sync({ alter: true });
+      });
+      return true;
+    } catch (e) {
+      console.error(e);
+    }
+    return false;
   }
 
   protected get tenantRepoInstance() {
@@ -25,7 +54,7 @@ export class TenantProviderService<T extends Model<T, T>> {
   private fetchTenantRepoInstance = () => {
     if (!TenantProviderService.entities[this.entityModel.name])
       throw new Error(
-        'Model not registered (Register it by calling registerEntity(entity: ModelCtor) method ).',
+        'Model not auto-registered. You can register manually it by calling the registerEntity(entity: ModelCtor) method.',
       );
     return this.repository
       .getRepo(this.entityModel)
@@ -34,38 +63,6 @@ export class TenantProviderService<T extends Model<T, T>> {
   private fetchPublicRepoInstance = () => {
     return this.repository.getRepo(this.entityModel).schema('public');
   };
-  private static entities: EntityModelMap = {};
-  // private entities2 = {
-  //   'Tenant': this.entityModel,
-  //   'User': this.entityModel,
-  // };
-
-  protected async registerEntity(entity: ModelCtor) {
-    console.log(
-      'registering module',
-      Object.keys(TenantProviderService.entities),
-    );
-    if (!TenantProviderService.entities[entity.name]) {
-      TenantProviderService.entities[entity.name] = entity;
-      console.log('registering module', entity.name);
-    }
-  }
-
-  private async getSchema(schemaName) {
-    try {
-      const schemaExistSql = `SELECT schema_name FROM information_schema.schemata WHERE schema_name = ?`;
-      const [schemaExist] = await this.publicRepoInstance.sequelize.query(
-        schemaExistSql,
-        {
-          replacements: [schemaName],
-        },
-      );
-      return schemaExist;
-    } catch (e) {
-      console.error(e);
-    }
-    return null;
-  }
 
   protected async createSchema(schemaName: string) {
     try {
@@ -84,18 +81,25 @@ export class TenantProviderService<T extends Model<T, T>> {
     }
     return false;
   }
+  // private entities2 = {
+  //   'Tenant': this.entityModel,
+  //   'User': this.entityModel,
+  // };
 
-  protected async applyMigrationsToTenant(schema: string) {
+  private async getSchema(schemaName) {
     try {
-      // apply migration to migrate registere entities
-      Object.values(TenantProviderService.entities).forEach((entity) => {
-        this.repository.getRepo(entity).schema(schema).sync({ alter: true });
-      });
-      return true;
+      const schemaExistSql = `SELECT schema_name FROM information_schema.schemata WHERE schema_name = ?`;
+      const [schemaExist] = await this.publicRepoInstance.sequelize.query(
+        schemaExistSql,
+        {
+          replacements: [schemaName],
+        },
+      );
+      return schemaExist;
     } catch (e) {
       console.error(e);
     }
-    return false;
+    return null;
   }
 
   async deleteSchema(schemaName: string): Promise<boolean> {
@@ -158,5 +162,13 @@ export class TenantProviderService<T extends Model<T, T>> {
     const [result] = await this.publicRepoInstance.sequelize.query(query);
     const dependencies = result.map((row: any) => row.conname);
     return dependencies;
+  }
+
+  processSubdomain(schemaName: string) {
+    return processSubdomain(schemaName);
+  }
+
+  isPublicSchema(subdomain: string) {
+    return isPublicSchema(subdomain);
   }
 }
