@@ -1,14 +1,12 @@
 import { Model, ModelCtor } from 'sequelize-typescript';
-import { BaseInterfaceRepository } from 'src/repositories/base/base.interface.repository';
-import { SchemaService } from 'src/database-module/service/schema.service';
-import { Injectable } from '@nestjs/common';
+import { BaseInterfaceRepository } from './../../repositories/base/base.interface.repository';
+import { SchemaService } from './../../database-module/service/schema.service';
 import { isPublicSchema, processSubdomain } from './../utils/utils';
 
 type EntityModelMap = {
   [key: string]: ModelCtor<any>;
 };
 
-@Injectable()
 export class TenantProviderService<T extends Model<T, T>> {
   constructor(
     protected readonly repository: BaseInterfaceRepository<T>,
@@ -20,10 +18,6 @@ export class TenantProviderService<T extends Model<T, T>> {
   private static entities: EntityModelMap = {};
 
   protected async registerEntity(entity: ModelCtor) {
-    console.log(
-      'registering module',
-      Object.keys(TenantProviderService.entities),
-    );
     if (!TenantProviderService.entities[entity.name]) {
       TenantProviderService.entities[entity.name] = entity;
       console.log('registering module', entity.name);
@@ -130,7 +124,6 @@ export class TenantProviderService<T extends Model<T, T>> {
       // Drop the schema
       sql += `DROP SCHEMA "${schemaName}" cascade;`;
       sql = `${dependenciesSQL}${sql}`;
-      // console.log('sql', sql);
       await this.publicRepoInstance.sequelize.query(sql);
 
       // Check if the schema still exists
